@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sales Dashboard</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #333;
+      padding: 20px;
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      color: white;
+      font-size: 2rem;
+      margin-bottom: 20px;
+      text-align: center;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .section {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .section-header {
+      font-size: 1.3rem;
+      font-weight: 600;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #667eea;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .call-item, .booking-item {
+      padding: 15px;
+      margin-bottom: 12px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      border-left: 4px solid #667eea;
+    }
+    
+    .call-item:last-child, .booking-item:last-child {
+      margin-bottom: 0;
+    }
+    
+    .call-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #2d3748;
+    }
+    
+    .call-time {
+      color: #667eea;
+      font-weight: 500;
+      margin-bottom: 5px;
+    }
+    
+    .call-location, .call-description {
+      color: #718096;
+      font-size: 0.9rem;
+      margin-top: 5px;
+    }
+    
+    .empty-state {
+      text-align: center;
+      color: #a0aec0;
+      padding: 20px;
+      font-style: italic;
+    }
+    
+    .last-updated {
+      text-align: center;
+      color: rgba(255,255,255,0.8);
+      font-size: 0.85rem;
+      margin-top: 20px;
+    }
+    
+    .loading {
+      text-align: center;
+      color: white;
+      padding: 40px;
+      font-size: 1.2rem;
+    }
+
+    .error {
+      background: #fff5f5;
+      border: 2px solid #fc8181;
+      border-radius: 8px;
+      padding: 15px;
+      color: #c53030;
+      margin: 20px 0;
+    }
+    
+    @media (max-width: 600px) {
+      body {
+        padding: 10px;
+      }
+      
+      h1 {
+        font-size: 1.5rem;
+      }
+      
+      .section {
+        padding: 15px;
+      }
+      
+      .section-header {
+        font-size: 1.1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📊 Sales Dashboard</h1>
+    
+    <div id="loading" class="loading">Loading...</div>
+    <div id="error" style="display: none;"></div>
+    
+    <div id="content" style="display: none;">
+      <div class="section">
+        <div class="section-header">
+          📞 Today's Calls
+        </div>
+        <div id="calls-container"></div>
+      </div>
+      
+      <div class="section">
+        <div class="section-header">
+          🗓️ Recent Calendly Bookings
+        </div>
+        <div id="bookings-container"></div>
+      </div>
+    </div>
+    
+    <div class="last-updated" id="last-updated"></div>
+  </div>
+
+  <script>
+    function formatTime(dateStr) {
+      const date = new Date(dateStr);
+      return date.toLocaleString('en-AU', {
+        timeZone: 'Australia/Sydney',
+        hour: '2-digit',
+        minute: '2-digit',
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short'
+      });
+    }
+    
+    function formatDate(dateStr) {
+      const date = new Date(dateStr);
+      return date.toLocaleString('en-AU', {
+        timeZone: 'Australia/Sydney',
+        day: 'numeric',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+    
+    function loadData() {
+      const apiUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'http://localhost:8888/.netlify/functions/api'
+        : '/.netlify/functions/api';
+
+      fetch(apiUrl)
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
+        .then(data => {
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('error').style.display = 'none';
+          document.getElementById('content').style.display = 'block';
+          
+          // Render calls
+          const callsContainer = document.getElementById('calls-container');
+          if (data.calls && data.calls.length > 0) {
+            callsContainer.innerHTML = data.calls.map(call => `
+              <div class="call-item">
+                <div class="call-title">${call.title}</div>
+                <div class="call-time">🕐 ${formatTime(call.start)}</div>
+                ${call.location ? `<div class="call-location">📍 ${call.location}</div>` : ''}
+                ${call.description ? `<div class="call-description">${call.description.substring(0, 150)}...</div>` : ''}
+              </div>
+            `).join('');
+          } else {
+            callsContainer.innerHTML = '<div class="empty-state">No calls scheduled for today</div>';
+          }
+          
+          // Render bookings
+          const bookingsContainer = document.getElementById('bookings-container');
+          if (data.bookings && data.bookings.length > 0) {
+            bookingsContainer.innerHTML = data.bookings.map(booking => `
+              <div class="booking-item">
+                <div class="call-title">${booking.subject}</div>
+                <div class="call-time">📅 ${formatDate(booking.date)}</div>
+              </div>
+            `).join('');
+          } else {
+            bookingsContainer.innerHTML = '<div class="empty-state">No recent bookings</div>';
+          }
+          
+          // Update timestamp
+          const lastUpdated = new Date(data.lastUpdated);
+          document.getElementById('last-updated').textContent = 
+            `Last updated: ${lastUpdated.toLocaleTimeString('en-AU')}`;
+        })
+        .catch(err => {
+          console.error('Error loading data:', err);
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('error').innerHTML = `
+            <div class="error">
+              <strong>⚠️ Error loading dashboard</strong><br>
+              ${err.message || 'Please check your connection and try again.'}
+            </div>
+          `;
+          document.getElementById('error').style.display = 'block';
+        });
+    }
+    
+    // Load on page load
+    loadData();
+    
+    // Refresh every 30 seconds
+    setInterval(loadData, 30000);
+  </script>
+</body>
+</html>
