@@ -32,6 +32,82 @@
       text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
     }
     
+    /* Login Form Styles */
+    .login-container {
+      max-width: 400px;
+      margin: 100px auto;
+      background: white;
+      border-radius: 12px;
+      padding: 40px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .login-header {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 30px;
+      text-align: center;
+      color: #2d3748;
+    }
+    
+    .login-form input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 1rem;
+      margin-bottom: 15px;
+      transition: border-color 0.3s;
+    }
+    
+    .login-form input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    
+    .login-form button {
+      width: 100%;
+      padding: 12px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    
+    .login-form button:hover {
+      background: #5568d3;
+    }
+    
+    .login-form button:disabled {
+      background: #a0aec0;
+      cursor: not-allowed;
+    }
+    
+    .error-message {
+      background: #fff5f5;
+      border: 2px solid #fc8181;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 15px;
+      color: #c53030;
+      font-size: 0.9rem;
+    }
+    
+    .security-note {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f7fafc;
+      border-left: 4px solid #667eea;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      color: #4a5568;
+    }
+    
+    /* Dashboard Styles */
     .section {
       background: white;
       border-radius: 12px;
@@ -102,14 +178,33 @@
       padding: 40px;
       font-size: 1.2rem;
     }
-
+    
     .error {
       background: #fff5f5;
       border: 2px solid #fc8181;
       border-radius: 8px;
-      padding: 15px;
-      color: #c53030;
+      padding: 20px;
       margin: 20px 0;
+      color: #c53030;
+      text-align: center;
+    }
+    
+    .logout-btn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 8px 16px;
+      background: rgba(255,255,255,0.2);
+      color: white;
+      border: 2px solid white;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    
+    .logout-btn:hover {
+      background: rgba(255,255,255,0.3);
     }
     
     @media (max-width: 600px) {
@@ -128,36 +223,146 @@
       .section-header {
         font-size: 1.1rem;
       }
+      
+      .login-container {
+        margin: 50px auto;
+        padding: 30px 20px;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>📊 Sales Dashboard</h1>
+  <!-- Login Screen -->
+  <div id="login-screen" class="login-container">
+    <div class="login-header">🔒 Sales Dashboard Login</div>
     
-    <div id="loading" class="loading">Loading...</div>
-    <div id="error" style="display: none;"></div>
+    <div id="login-error" class="error-message" style="display: none;"></div>
     
-    <div id="content" style="display: none;">
-      <div class="section">
-        <div class="section-header">
-          📞 Today's Calls
+    <form class="login-form" id="login-form">
+      <input 
+        type="password" 
+        id="password-input" 
+        placeholder="Enter dashboard password"
+        autocomplete="current-password"
+        required
+      />
+      <button type="submit" id="login-btn">Login</button>
+    </form>
+    
+    <div class="security-note">
+      🛡️ <strong>Security Features:</strong><br>
+      • Password-protected access<br>
+      • Audit logging enabled<br>
+      • Credentials encrypted in transit<br>
+      • Session expires after 24 hours
+    </div>
+  </div>
+
+  <!-- Dashboard Screen -->
+  <div id="dashboard-screen" style="display: none;">
+    <button class="logout-btn" onclick="logout()">Logout</button>
+    
+    <div class="container">
+      <h1>📊 Sales Dashboard</h1>
+      
+      <div id="loading" class="loading">Loading...</div>
+      
+      <div id="error" style="display: none;"></div>
+      
+      <div id="content" style="display: none;">
+        <div class="section">
+          <div class="section-header">
+            📞 Today's Calls
+          </div>
+          <div id="calls-container"></div>
         </div>
-        <div id="calls-container"></div>
+        
+        <div class="section">
+          <div class="section-header">
+            🗓️ Recent Calendly Bookings
+          </div>
+          <div id="bookings-container"></div>
+        </div>
       </div>
       
-      <div class="section">
-        <div class="section-header">
-          🗓️ Recent Calendly Bookings
-        </div>
-        <div id="bookings-container"></div>
-      </div>
+      <div class="last-updated" id="last-updated"></div>
     </div>
-    
-    <div class="last-updated" id="last-updated"></div>
   </div>
 
   <script>
+    // Authentication state
+    let authToken = localStorage.getItem('dashboardAuthToken');
+    let authExpiry = localStorage.getItem('dashboardAuthExpiry');
+    
+    // Check if user is logged in
+    if (authToken && authExpiry && Date.now() < parseInt(authExpiry)) {
+      showDashboard();
+    } else {
+      showLogin();
+    }
+    
+    // Login form handler
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const password = document.getElementById('password-input').value;
+      const loginBtn = document.getElementById('login-btn');
+      const errorDiv = document.getElementById('login-error');
+      
+      loginBtn.disabled = true;
+      loginBtn.textContent = 'Authenticating...';
+      errorDiv.style.display = 'none';
+      
+      try {
+        const response = await fetch('/.netlify/functions/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          // Store auth token
+          localStorage.setItem('dashboardAuthToken', data.token);
+          localStorage.setItem('dashboardAuthExpiry', data.expiry);
+          authToken = data.token;
+          authExpiry = data.expiry;
+          
+          showDashboard();
+        } else {
+          errorDiv.textContent = '❌ ' + (data.error || 'Authentication failed');
+          errorDiv.style.display = 'block';
+          loginBtn.disabled = false;
+          loginBtn.textContent = 'Login';
+        }
+      } catch (error) {
+        errorDiv.textContent = '❌ Connection error. Please try again.';
+        errorDiv.style.display = 'block';
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Login';
+      }
+    });
+    
+    function showLogin() {
+      document.getElementById('login-screen').style.display = 'block';
+      document.getElementById('dashboard-screen').style.display = 'none';
+    }
+    
+    function showDashboard() {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('dashboard-screen').style.display = 'block';
+      loadData();
+      setInterval(loadData, 30000); // Refresh every 30 seconds
+    }
+    
+    function logout() {
+      localStorage.removeItem('dashboardAuthToken');
+      localStorage.removeItem('dashboardAuthExpiry');
+      authToken = null;
+      showLogin();
+    }
+    
     function formatTime(dateStr) {
       const date = new Date(dateStr);
       return date.toLocaleString('en-AU', {
@@ -182,13 +387,19 @@
     }
     
     function loadData() {
-      const apiUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        ? 'http://localhost:8888/.netlify/functions/api'
-        : '/.netlify/functions/api';
-
-      fetch(apiUrl)
+      // Call Netlify Function with auth token
+      fetch('/.netlify/functions/api', {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      })
         .then(res => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          if (res.status === 401) {
+            // Session expired
+            logout();
+            throw new Error('Session expired');
+          }
+          if (!res.ok) throw new Error('Failed to fetch data');
           return res.json();
         })
         .then(data => {
@@ -230,23 +441,19 @@
             `Last updated: ${lastUpdated.toLocaleTimeString('en-AU')}`;
         })
         .catch(err => {
-          console.error('Error loading data:', err);
-          document.getElementById('loading').style.display = 'none';
-          document.getElementById('error').innerHTML = `
-            <div class="error">
-              <strong>⚠️ Error loading dashboard</strong><br>
-              ${err.message || 'Please check your connection and try again.'}
-            </div>
-          `;
-          document.getElementById('error').style.display = 'block';
+          if (err.message !== 'Session expired') {
+            console.error('Error loading data:', err);
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('error').innerHTML = `
+              <div class="error">
+                ⚠️ Unable to load dashboard data<br>
+                <small>${err.message}</small>
+              </div>
+            `;
+          }
         });
     }
-    
-    // Load on page load
-    loadData();
-    
-    // Refresh every 30 seconds
-    setInterval(loadData, 30000);
   </script>
 </body>
 </html>
